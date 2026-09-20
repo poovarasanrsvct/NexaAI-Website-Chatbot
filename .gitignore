@@ -1,1 +1,176 @@
+from flask import Flask, request, jsonify, render_template
+import re
 
+app = Flask(__name__)
+
+
+INTENTS = {
+    "greeting": {
+        "patterns": [
+            "hi",
+            "hello",
+            "hey",
+            "good morning",
+            "good evening"
+        ],
+        "responses": [
+            "Hello! Welcome to NexaAI. How can I help you?",
+            "Hi! I am NexaAI. What would you like to know?"
+        ]
+    },
+
+    "help": {
+        "patterns": [
+            "help",
+            "support",
+            "what can you do"
+        ],
+        "responses": [
+            "I can help you with services, pricing, contact details and support."
+        ]
+    },
+
+    "services": {
+        "patterns": [
+            "service",
+            "services",
+            "products",
+            "what do you offer"
+        ],
+        "responses": [
+            "We provide digital solutions, cloud services and customer support tools."
+        ]
+    },
+
+    "pricing": {
+        "patterns": [
+            "price",
+            "pricing",
+            "cost",
+            "plan",
+            "plans"
+        ],
+        "responses": [
+            "Our pricing depends on the features required. Please contact our support team."
+        ]
+    },
+
+    "contact": {
+        "patterns": [
+            "contact",
+            "phone",
+            "email",
+            "reach you"
+        ],
+        "responses": [
+            "You can contact us at support@nexaai.example."
+        ]
+    },
+
+    "hours": {
+        "patterns": [
+            "working hours",
+            "opening hours",
+            "timing",
+            "available"
+        ],
+        "responses": [
+            "Our support team is available Monday to Friday, 9 AM to 6 PM."
+        ]
+    },
+
+    "thanks": {
+        "patterns": [
+            "thanks",
+            "thank you",
+            "thx"
+        ],
+        "responses": [
+            "You're welcome!",
+            "Happy to help!"
+        ]
+    },
+
+    "bye": {
+        "patterns": [
+            "bye",
+            "goodbye",
+            "see you"
+        ],
+        "responses": [
+            "Goodbye! Have a great day."
+        ]
+    }
+}
+
+
+def clean_text(text):
+    text = text.lower().strip()
+    return re.sub(r"[^a-z0-9\s]", "", text)
+
+
+def find_intent(message):
+    text = clean_text(message)
+    words = set(text.split())
+
+    best_intent = None
+    best_score = 0
+
+    for intent, data in INTENTS.items():
+        score = 0
+
+        for pattern in data["patterns"]:
+            pattern = clean_text(pattern)
+            pattern_words = set(pattern.split())
+
+            if pattern in text:
+                score += 3
+            else:
+                score += len(words.intersection(pattern_words))
+
+        if score > best_score:
+            best_score = score
+            best_intent = intent
+
+    return best_intent
+
+
+def chatbot_response(message):
+    if not message.strip():
+        return "Please type a message."
+
+    intent = find_intent(message)
+
+    if intent is None:
+        return (
+            "Sorry, I don't have an answer for that yet. "
+            "Please ask about services, pricing, support or contact."
+        )
+
+    responses = INTENTS[intent]["responses"]
+
+    return responses[len(message) % len(responses)]
+
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json()
+
+    message = str(data.get("message", ""))
+
+    return jsonify({
+        "reply": chatbot_response(message)
+    })
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )
